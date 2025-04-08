@@ -53,7 +53,6 @@ It'll provide you with the code which you should replace with in the `main.go` f
 KeyAuthApp.Api(
     "example", // -- Application Name
     "JjPMBVlIOd", // -- Owner ID
-    "db40d586f4b189e04e5c18c3c94b7e72221be3f6551995adc05236948d1762bc", // -- Application Secret
     "1.0", // -- Application Version
     "", // -- Token Path (PUT NULL OR LEAVE BLANK IF YOU DON'T WANT TO USE TOKEN SYSTEM)
 )
@@ -329,5 +328,3 @@ Example on how to send chat message.
 * Send chat message
 KeyAuthApp.ChatSend("MESSAGE", "CHANNEL")
 ```
-
-Looking for a Discord bot made by the KeyAuth & RestoreCord founder that you can use to backup your Discord members, server settings, and messages? Go to https://vaultcord.com
