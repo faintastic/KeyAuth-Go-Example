@@ -2,14 +2,15 @@ package keyauth
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"fmt"
 	"io"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
-	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,52 +20,51 @@ import (
 	"net/url"
 	"os/exec"
 	"path/filepath"
-
-	"github.com/google/uuid"
 )
 
 var (
-    APIUrl           string = "https://keyauth.win/api/1.2/"
-    NumUsers         string
-    NumOnlineUsers   string
-    NumKeys          string
-    CustomerPanelURL string
-    SessionID        string = "lol"
+	APIUrl           string = "https://keyauth.win/api/1.3/"
+	NumUsers         string
+	NumOnlineUsers   string
+	NumKeys          string
+	CustomerPanelURL string
+	SessionID        string = "lol"
 )
 
 var (
-    Name          string
-    OwnerID       string
-    Secret        string
-    Version       string
-	TokenPath	  string
-    Username      string
-    IP            string
-    HWID          string
-    CreatedDate   string
-    Expires       string
-    LastLogin     string
-    Subscription  string
-    Subscriptions string
-    Initialized   bool
-	EncKey        string
+	Name          string
+	OwnerID       string
+	Secret        string
+	Version       string
+	TokenPath     string
+	Username      string
+	IP            string
+	HWID          string
+	CreatedDate   string
+	Expires       string
+	LastLogin     string
+	Subscription  string
+	Subscriptions string
+	Initialized   bool
+	PublicKey     string = "5586b4bc69c7a4b487e4563a4cd96afd39140f919bd31cea7d1c6a1e8439422b"
 )
 
-func Api(name, ownerid, secret, version, path string) {
-    if name == "" || ownerid == "" || secret == "" || version == "" || len(ownerid) != 10 || len(secret) != 64 {
-        fmt.Println("Application not set up properly.")
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+func Api(name, ownerid, version, path string) {
+	if name == "" || ownerid == "" || version == "" || len(ownerid) != 10 {
+		fmt.Println("Application not set up properly.")
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    Name = name
-    OwnerID = ownerid
-    Secret = secret
-    Version = version
+	Name = name
+	OwnerID = ownerid
+	Version = version
 	TokenPath = path
-	if path == "null" { TokenPath = "" }
+	if path == "null" {
+		TokenPath = ""
+	}
 
-    Init()
+	Init()
 }
 
 func Init() {
@@ -74,17 +74,13 @@ func Init() {
 		os.Exit(1)
 	}
 
-	sentKey := uuid.New().String()[:16]
-	EncKey = sentKey + "-" + Secret
-	
 	postData := map[string]string{
 		"type":    "init",
 		"ver":     Version,
 		"hash":    checkSum(filepath.Base(os.Args[0])),
-		"enckey":  sentKey,
 		"name":    Name,
 		"ownerid": OwnerID,
-	}	
+	}
 
 	if TokenPath != "" {
 		token, err := ioutil.ReadFile(TokenPath)
@@ -95,7 +91,7 @@ func Init() {
 		postData["thash"] = tokenHash(TokenPath)
 	}
 
-	response := doRequest(postData);
+	response := doRequest(postData)
 
 	if response == "KeyAuth_Invalid" {
 		fmt.Println("The application does not exist.")
@@ -143,99 +139,99 @@ func Register(user, password, license string) {
 
 	hwid := GetHWID()
 
-    postData := map[string]string{
-        "type":      "register",
-        "username":  user,
-        "pass":      password,
-        "key":       license,
-        "hwid":      hwid,
-        "sessionid": SessionID,
-        "name":      Name,
-        "ownerid":   OwnerID,
-    }
+	postData := map[string]string{
+		"type":      "register",
+		"username":  user,
+		"pass":      password,
+		"key":       license,
+		"hwid":      hwid,
+		"sessionid": SessionID,
+		"name":      Name,
+		"ownerid":   OwnerID,
+	}
 
 	response := doRequest(postData)
 
-    var jsonResponse map[string]interface{}
-    if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
 		fmt.Println("Error decoding JSON response: " + err.Error())
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    if jsonResponse["success"].(bool) {
+	if jsonResponse["success"].(bool) {
 		fmt.Println(jsonResponse["message"].(string))
-        LoadUserData(jsonResponse["info"])
-    } else {
+		LoadUserData(jsonResponse["info"])
+	} else {
 		fmt.Println(jsonResponse["message"].(string))
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 }
 
 func Login(user, password string) {
-    CheckInit()
+	CheckInit()
 
-    hwid := GetHWID()
+	hwid := GetHWID()
 
-    postData := map[string]string{
-        "type":      "login",
-        "username":  user,
-        "pass":      password,
-        "hwid":      hwid,
-        "sessionid": SessionID,
-        "name":      Name,
-        "ownerid":   OwnerID,
-    }
+	postData := map[string]string{
+		"type":      "login",
+		"username":  user,
+		"pass":      password,
+		"hwid":      hwid,
+		"sessionid": SessionID,
+		"name":      Name,
+		"ownerid":   OwnerID,
+	}
 
-    response := doRequest(postData)
+	response := doRequest(postData)
 
-    var jsonResponse map[string]interface{}
-    if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
 		fmt.Println("Error decoding JSON response: " + err.Error())
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    if jsonResponse["success"].(bool) {
+	if jsonResponse["success"].(bool) {
 		fmt.Println(jsonResponse["message"].(string))
-        LoadUserData(jsonResponse["info"])
-    } else {
+		LoadUserData(jsonResponse["info"])
+	} else {
 		fmt.Println(jsonResponse["message"].(string))
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 }
 
 func Forgot(user, email string) {
-    CheckInit()
+	CheckInit()
 
-    postData := map[string]string{
-        "type":      "forgot",
-        "username":  user,
-        "email":     email,
-        "sessionid": SessionID,
-        "name":      Name,
-        "ownerid":   OwnerID,
-    }
+	postData := map[string]string{
+		"type":      "forgot",
+		"username":  user,
+		"email":     email,
+		"sessionid": SessionID,
+		"name":      Name,
+		"ownerid":   OwnerID,
+	}
 
-    response := doRequest(postData)
+	response := doRequest(postData)
 
-    var jsonResponse map[string]interface{}
-    if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
 		fmt.Println("Error decoding JSON response: " + err.Error())
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    if jsonResponse["success"].(bool) {
+	if jsonResponse["success"].(bool) {
 		fmt.Println(jsonResponse["message"].(string))
-        LoadUserData(jsonResponse["info"])
-    } else {
+		LoadUserData(jsonResponse["info"])
+	} else {
 		fmt.Println(jsonResponse["message"].(string))
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 }
 
 func Upgrade(user, license string) {
@@ -252,23 +248,23 @@ func Upgrade(user, license string) {
 
 	response := doRequest(postData)
 
-    var jsonResponse map[string]interface{}
-    if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
+	var jsonResponse map[string]interface{}
+	if err := json.Unmarshal([]byte(response), &jsonResponse); err != nil {
 		fmt.Println("Error decoding JSON response: " + err.Error())
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    if jsonResponse["success"].(bool) {
+	if jsonResponse["success"].(bool) {
 		fmt.Println(jsonResponse["message"].(string))
 		fmt.Println("Please restart the application and login again to see the changes.")
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    } else {
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	} else {
 		fmt.Println(jsonResponse["message"].(string))
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 }
 
 func License(key string) {
@@ -332,7 +328,7 @@ func Var(name string) string {
 		os.Exit(1)
 	}
 
-    return ""
+	return ""
 }
 
 func GetVar(varName string) string {
@@ -582,7 +578,7 @@ func FetchStats() {
 	}
 
 	if jsonResponse["success"].(bool) {
-        LoadAppData(jsonResponse["appinfo"])
+		LoadAppData(jsonResponse["appinfo"])
 	}
 }
 
@@ -663,11 +659,11 @@ func ChangeUsername(username string) {
 	CheckInit()
 
 	postData := map[string]string{
-		"type":       "changeUsername",
+		"type":        "changeUsername",
 		"newUsername": username,
-		"sessionid":  SessionID,
-		"name":       Name,
-		"ownerid":    OwnerID,
+		"sessionid":   SessionID,
+		"name":        Name,
+		"ownerid":     OwnerID,
 	}
 
 	response := doRequest(postData)
@@ -733,87 +729,123 @@ func IsEmpty() {
 }
 
 func doRequest(postData map[string]string) string {
-    requestBody := url.Values{}
-    for key, value := range postData {
-        requestBody.Set(key, value)
-    }
+	requestBody := url.Values{}
+	for key, value := range postData {
+		requestBody.Set(key, value)
+	}
 
-    req, err := http.NewRequest("POST", APIUrl, strings.NewReader(requestBody.Encode()))
-    if err != nil {
-        fmt.Println("Error creating request:", err)
-        return ""
-    }
-    req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, err := http.NewRequest("POST", APIUrl, strings.NewReader(requestBody.Encode()))
+	if err != nil {
+		fmt.Println("Error creating request:", err)
+		return ""
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-    client := http.Client{Timeout: 10 * time.Second}
-    response, err := client.Do(req)
-    if err != nil {
-        fmt.Println("Error sending request:", err)
-        return ""
-    }
-    defer response.Body.Close()
+	client := http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(req)
+	if err != nil {
+		fmt.Println("Error sending request:", err)
+		return ""
+	}
+	defer response.Body.Close()
 
-    responseBody, err := io.ReadAll(response.Body)
-    if err != nil {
-        fmt.Println("Error reading response:", err)
-        return ""
-    }
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Println("Error reading response:", err)
+		return ""
+	}
 
-    key := EncKey
-    if postData["type"] == "init" {
-        key = Secret
-    }
+	signature := response.Header.Get("x-signature-ed25519")
+	timestamp := response.Header.Get("x-signature-timestamp")
+	if signature == "" || timestamp == "" {
+		fmt.Println("Missing signature or timestamp in response headers")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
 
-    clientComputed := hmac.New(sha256.New, []byte(key))
-    clientComputed.Write(responseBody)
-    clientComputedStr := hex.EncodeToString(clientComputed.Sum(nil))
+	serverTime, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil {
+		fmt.Println("Invalid timestamp format:", err)
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+	currentTime := time.Now().Unix()
+	bufferSeconds := int64(5)
+	if abs(currentTime-serverTime) > bufferSeconds+20 {
+		fmt.Printf("Time difference is too large: %d seconds, try syncing your date and time settings.\n", abs(currentTime-serverTime))
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
 
-    signature := response.Header.Get("signature")
+	if !verifySignature(responseBody, signature, timestamp, PublicKey) {
+		fmt.Println("Signature checksum failed. Request was tampered with or session ended most likely.")
+		time.Sleep(3 * time.Second)
+		os.Exit(1)
+	}
 
-    if clientComputedStr != signature {
-        fmt.Println("Signature checksum failed. Request was tampered with or session ended most likely.")
-        fmt.Println("Response:", string(responseBody))
-        time.Sleep(3 * time.Second)
-        os.Exit(1)
-    }
+	exeName := filepath.Base(os.Args[0])
+	debugPath := filepath.Join("C:\\ProgramData\\KeyAuth\\Debug", exeName)
 
-    exeName := filepath.Base(os.Args[0])
-    debugPath := filepath.Join("C:\\ProgramData\\KeyAuth\\Debug", exeName)
+	if _, err := os.Stat(debugPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(debugPath, 0755); err != nil {
+			fmt.Println("Error creating debug directory:", err)
+		}
+	}
 
-    if _, err := os.Stat(debugPath); os.IsNotExist(err) {
-        if err := os.MkdirAll(debugPath, 0755); err != nil {
-            fmt.Println("Error creating debug directory:", err)
-        }
-    }
+	if len(string(responseBody)) <= 200 {
+		tampered := false
+		executionTime := time.Now().Format("03:04:05 PM | 01/02/2006")
 
-    if len(string(responseBody)) <= 200 {
-        tampered := clientComputedStr != signature
-        executionTime := time.Now().Format("03:04:05 PM | 01/02/2006")
-        
-        redactedResponse := redactFields(responseBody)
-        
-        debugLog := fmt.Sprintf("\n%s | %s \nResponse: %s\nWas response tampered with? %v\n", executionTime, postData["type"], redactedResponse, tampered)
-        
-        if err := writeDebugLogToFile(filepath.Join(debugPath, "log.txt"), debugLog); err != nil {
-            fmt.Println("Error writing debug log to file:", err)
-        }
-    }
+		redactedResponse := redactFields(responseBody)
 
-    return string(responseBody)
+		debugLog := fmt.Sprintf("\n%s | %s \nResponse: %s\nWas response tampered with? %v\n", executionTime, postData["type"], redactedResponse, tampered)
+
+		if err := writeDebugLogToFile(filepath.Join(debugPath, "log.txt"), debugLog); err != nil {
+			fmt.Println("Error writing debug log to file:", err)
+		}
+	}
+
+	return string(responseBody)
+}
+
+func verifySignature(responseBody []byte, signature, timestamp, publicKey string) bool {
+	message := append([]byte(timestamp), responseBody...)
+
+	signatureBytes, err := hex.DecodeString(signature)
+	if err != nil {
+		fmt.Println("Error decoding signature:", err)
+		return false
+	}
+
+	publicKeyBytes, err := hex.DecodeString(publicKey)
+	if err != nil {
+		fmt.Println("Error decoding public key:", err)
+		return false
+	}
+
+	verified := ed25519.Verify(publicKeyBytes, message, signatureBytes)
+	return verified
+}
+
+func abs(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
 
 func GetHWID() string {
-    switch runtime.GOOS {
-    case "linux":
-        out, err := exec.Command("cat", "/etc/machine-id").Output()
-        if err != nil {
+	switch runtime.GOOS {
+	case "linux":
+		out, err := exec.Command("cat", "/etc/machine-id").Output()
+		if err != nil {
 			fmt.Println("Error reading /etc/machine-id: " + err.Error())
-            return ""
-        }
-        hwid := string(out)
-        return hwid
+			return ""
+		}
+		hwid := string(out)
+		return hwid
 
-    case "windows":
+	case "windows":
 		const xx = "cmd.exe"
 
 		var stdout bytes.Buffer
@@ -823,119 +855,121 @@ func GetHWID() string {
 		if err != nil {
 			return ""
 		}
-	
+
 		return strings.TrimSpace(strings.TrimPrefix(stdout.String(), "SID"))
 
-    case "darwin":
-        out, err := exec.Command("ioreg", "-l", "|", "grep", "IOPlatformSerialNumber").Output()
-        if err != nil {
+	case "darwin":
+		out, err := exec.Command("ioreg", "-l", "|", "grep", "IOPlatformSerialNumber").Output()
+		if err != nil {
 			fmt.Println("Error reading IOPlatformSerialNumber: " + err.Error())
-            return ""
-        }
-        serial := strings.Split(string(out), "=")[1]
-        hwid := strings.TrimSpace(strings.ReplaceAll(serial, " ", ""))
-        return hwid
+			return ""
+		}
+		serial := strings.Split(string(out), "=")[1]
+		hwid := strings.TrimSpace(strings.ReplaceAll(serial, " ", ""))
+		return hwid
 
-    default:
+	default:
 		fmt.Println("Unfortunatly you are on an unsupported OS.")
-        return ""
-    }
+		return ""
+	}
 }
 
 func checkSum(filename string) string {
-    file, err := os.Open(filename)
-    if err != nil { return "" }
-    defer file.Close()
+	file, err := os.Open(filename)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
 
-    hash := md5.New()
-    if _, err := io.Copy(hash, file); err != nil {
-        panic(err)
-    }
+	hash := md5.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		panic(err)
+	}
 
-    hashInBytes := hash.Sum(nil)
-    return hex.EncodeToString(hashInBytes)
+	hashInBytes := hash.Sum(nil)
+	return hex.EncodeToString(hashInBytes)
 }
 
 func LoadAppData(data interface{}) string {
-    appInfo, ok := data.(map[string]interface{})
-    if !ok {
-        return "Error: AppInfo data is not in expected format"
-    }
-    NumUsers = appInfo["numUsers"].(string)
-    NumKeys = appInfo["numKeys"].(string)
-    CustomerPanelURL = appInfo["customerPanelLink"].(string)
-    NumOnlineUsers = appInfo["numOnlineUsers"].(string)
+	appInfo, ok := data.(map[string]interface{})
+	if !ok {
+		return "Error: AppInfo data is not in expected format"
+	}
+	NumUsers = appInfo["numUsers"].(string)
+	NumKeys = appInfo["numKeys"].(string)
+	CustomerPanelURL = appInfo["customerPanelLink"].(string)
+	NumOnlineUsers = appInfo["numOnlineUsers"].(string)
 
-    return "";
+	return ""
 }
 
 func LoadUserData(data interface{}) string {
-    userInfo, ok := data.(map[string]interface{})
-    if !ok {
-        return "Error: UserInfo data is not in expected format"
-    }
+	userInfo, ok := data.(map[string]interface{})
+	if !ok {
+		return "Error: UserInfo data is not in expected format"
+	}
 
-    Username = userInfo["username"].(string)
-    IP = userInfo["ip"].(string)
-    
-    if hwidFloat, ok := userInfo["hwid"].(float64); ok {
-        HWID = fmt.Sprintf("%f", hwidFloat)
-    } else {
-        HWID = userInfo["hwid"].(string)
-    }
-    if HWID == "" {
-        HWID = "N/A"
-    }
+	Username = userInfo["username"].(string)
+	IP = userInfo["ip"].(string)
 
-    subscriptions, ok := userInfo["subscriptions"].([]interface{})
-    if ok && len(subscriptions) > 0 {
-        subscriptionData, ok := subscriptions[0].(map[string]interface{})
-        if ok {
-            Expires = subscriptionData["expiry"].(string)
-            Subscription = subscriptionData["subscription"].(string)
-        }
-    }
+	if hwidFloat, ok := userInfo["hwid"].(float64); ok {
+		HWID = fmt.Sprintf("%f", hwidFloat)
+	} else {
+		HWID = userInfo["hwid"].(string)
+	}
+	if HWID == "" {
+		HWID = "N/A"
+	}
 
-    CreatedDate = userInfo["createdate"].(string)
-    LastLogin = userInfo["lastlogin"].(string)
-    subscriptionsJSON, err := json.Marshal(subscriptions)
-    if err != nil { 
-        return "Error converting subscriptions to JSON: " + err.Error() 
-    }
-    Subscriptions = string(subscriptionsJSON)
-    return ""
+	subscriptions, ok := userInfo["subscriptions"].([]interface{})
+	if ok && len(subscriptions) > 0 {
+		subscriptionData, ok := subscriptions[0].(map[string]interface{})
+		if ok {
+			Expires = subscriptionData["expiry"].(string)
+			Subscription = subscriptionData["subscription"].(string)
+		}
+	}
+
+	CreatedDate = userInfo["createdate"].(string)
+	LastLogin = userInfo["lastlogin"].(string)
+	subscriptionsJSON, err := json.Marshal(subscriptions)
+	if err != nil {
+		return "Error converting subscriptions to JSON: " + err.Error()
+	}
+	Subscriptions = string(subscriptionsJSON)
+	return ""
 }
 
 func openUrl(url string) error {
-    var cmd string
-    var args []string
+	var cmd string
+	var args []string
 
-    switch runtime.GOOS {
-    case "windows":
-        cmd = "cmd"
-        args = []string{"/c", "start"}
-    case "darwin":
-        cmd = "open"
-    default:
-        cmd = "xdg-open"
-    }
-    args = append(args, url)
-    return exec.Command(cmd, args...).Start()
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+	default:
+		cmd = "xdg-open"
+	}
+	args = append(args, url)
+	return exec.Command(cmd, args...).Start()
 }
 
 func writeDebugLogToFile(filePath, debugLog string) error {
-    file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-    _, err = file.WriteString(debugLog)
-    if err != nil {
-        return err
-    }
+	_, err = file.WriteString(debugLog)
+	if err != nil {
+		return err
+	}
 
-    return nil
+	return nil
 }
 
 func tokenHash(tokenPath string) string {
@@ -949,25 +983,25 @@ func tokenHash(tokenPath string) string {
 }
 
 func redactFields(responseBody []byte) string {
-    var responseMap map[string]interface{}
-    if err := json.Unmarshal(responseBody, &responseMap); err != nil {
-        fmt.Println("Error unmarshalling response:", err)
-        return string(responseBody)
-    }
+	var responseMap map[string]interface{}
+	if err := json.Unmarshal(responseBody, &responseMap); err != nil {
+		fmt.Println("Error unmarshalling response:", err)
+		return string(responseBody)
+	}
 
-    sensitiveFields := []string{"sessionid", "ownerid", "app", "secret", "version", "fileid", "webhooks"}
+	sensitiveFields := []string{"sessionid", "ownerid", "app", "secret", "version", "fileid", "webhooks"}
 
-    for _, field := range sensitiveFields {
-        if _, exists := responseMap[field]; exists {
-            responseMap[field] = "REDACTED"
-        }
-    }
+	for _, field := range sensitiveFields {
+		if _, exists := responseMap[field]; exists {
+			responseMap[field] = "REDACTED"
+		}
+	}
 
-    redactedResponse, err := json.Marshal(responseMap)
-    if err != nil {
-        fmt.Println("Error marshalling redacted response:", err)
-        return string(responseBody)
-    }
+	redactedResponse, err := json.Marshal(responseMap)
+	if err != nil {
+		fmt.Println("Error marshalling redacted response:", err)
+		return string(responseBody)
+	}
 
-    return string(redactedResponse)
+	return string(redactedResponse)
 }
