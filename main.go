@@ -17,10 +17,10 @@ func Input(message string) string {
 
 func main() {
 	KeyAuthApp.Api(
-		"KeyAuth",    // -- Application Name
-		"mpgOizljNW", // -- Owner ID
-		"1.1",        // -- Application Version
-		"",           // -- Token Path (PUT NULL OR LEAVE BLANK IF YOU DON'T WANT TO USE TOKEN SYSTEM)
+		"",    // -- Application Name
+		"",    // -- Owner ID
+		"1.0", // -- Application Version
+		"",    // -- Token Path (PUT NULL OR LEAVE BLANK IF YOU DON'T WANT TO USE TOKEN SYSTEM)
 	)
 
 	fmt.Println("[1] Login")

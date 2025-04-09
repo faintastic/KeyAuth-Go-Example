@@ -47,6 +47,7 @@ var (
 	Subscriptions string
 	Initialized   bool
 	PublicKey     string = "5586b4bc69c7a4b487e4563a4cd96afd39140f919bd31cea7d1c6a1e8439422b"
+	HashCheck     bool   = true // Set to false if you don't want to check the hash of the executable
 )
 
 func Api(name, ownerid, version, path string) {
@@ -77,9 +78,12 @@ func Init() {
 	postData := map[string]string{
 		"type":    "init",
 		"ver":     Version,
-		"hash":    checkSum(filepath.Base(os.Args[0])),
 		"name":    Name,
 		"ownerid": OwnerID,
+	}
+
+	if HashCheck {
+		postData["hash"] = checkSum(filepath.Base(os.Args[0]))
 	}
 
 	if TokenPath != "" {
@@ -883,7 +887,7 @@ func checkSum(filename string) string {
 
 	hash := md5.New()
 	if _, err := io.Copy(hash, file); err != nil {
-		panic(err)
+		return "" // Fail silently
 	}
 
 	hashInBytes := hash.Sum(nil)
