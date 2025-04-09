@@ -2,7 +2,7 @@
 
 KeyAuth Go example SDK for https://keyauth.cc license key API auth.
 
-**If you would like to disable hash checks via the program, change the "HashCheck" variable to `False` in `KeyAuth/KeyAuth.go`
+**If you would like to disable hash checks via the program, change the "HashCheck" variable to `False` in `KeyAuth/KeyAuth.go`**
 
 ## **Bugs**
 
